@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3D Viewer</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #222; }
+    body { margin: 0; overflow: hidden; background: #e0e0e0; }
     canvas { width: 100vw; height: 100vh; display: block; }
   </style>
-  <!-- Three.js and GLTFLoader via standard CDN -->
   <script type="importmap">
     {
       "imports": {
@@ -21,62 +20,60 @@
 <body>
   <script type="module">
     import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    // Scene, Camera, Renderer
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf0f0f0);
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 5000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     document.body.appendChild(renderer.domElement);
 
-    // Orbit Controls (Free rotation, pan, zoom)
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    const controls = new TrackballControls(camera, renderer.domElement);
+    controls.rotateSpeed = 3.0;
+    controls.zoomSpeed = 1.2;
+    controls.panSpeed = 0.8;
 
-    // Lighting
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
-    hemiLight.position.set(0, 20, 0);
+    hemiLight.position.set(0, 50, 0);
     scene.add(hemiLight);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-    dirLight.position.set(5, 10, 7);
+    dirLight.position.set(10, 20, 15);
     scene.add(dirLight);
 
-    // Load Model and Auto-Center Pivot
     const loader = new GLTFLoader();
     loader.load('parod_new_good.glb', (gltf) => {
       const model = gltf.scene;
 
-      // Automatically compute bounding box and center the model at (0, 0, 0)
+      // 1. Force compute bounding box on vertices directly
       const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
 
-      model.position.x += (model.position.x - center.x);
-      model.position.y += (model.position.y - center.y);
-      model.position.z += (model.position.z - center.z);
-
+      // 2. Shift the model's position so its centroid sits at (0, 0, 0)
+      model.position.sub(center);
       scene.add(model);
 
-      // Adjust camera distance to fit model size perfectly
+      // 3. Position camera relative to the actual object size
       const maxDim = Math.max(size.x, size.y, size.z);
-      camera.position.set(0, maxDim * 0.5, maxDim * 1.8);
-      camera.lookAt(0, 0, 0);
+      camera.position.set(0, maxDim * 0.8, maxDim * 2.2);
+      
+      // 4. Force controls target to exact center
       controls.target.set(0, 0, 0);
       controls.update();
+    }, undefined, (err) => {
+      console.error("Failed to load model:", err);
     });
 
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      controls.handleResize();
     });
 
     function animate() {
